@@ -23,6 +23,8 @@
         <h1>GCC Staking Rewards</h1>
         <button id="connectBtn">Connect Wallet</button>
         <p id="walletAddress"></p>
+        <p id="lpBalance"></p>
+        <p id="allowance"></p>
 
         <div class="input-group">
             <label for="amount">Amount (GCC-BNB LP 0x3d32d359bdad07C587a52F8811027675E4f5A833):</label>
@@ -42,7 +44,7 @@
     </main>
 
     <script>
-        const stakingTokenAddress = "0x092aC429b9c3450c9909433eB0662c3b7c13cF9A";
+        const stakingTokenAddress = "0x3d32d359bdad07C587a52F8811027675E4f5A833"; // LP Token Address
         const stakingContractAddress = "0x531DD2b75D345C6746957e44Bc22BF2E433094f8";
 
         const abiStakingContract = [
@@ -58,22 +60,35 @@
             "function balanceOf(address owner) public view returns (uint256)"
         ];
 
-        let provider, signer, stakingTokenContract, stakingContract;
+        let provider, signer, stakingTokenContract, stakingContract, userAddress;
 
         document.getElementById("connectBtn").addEventListener("click", async () => {
             if (window.ethereum) {
                 provider = new ethers.providers.Web3Provider(window.ethereum);
                 await provider.send("eth_requestAccounts", []);
                 signer = provider.getSigner();
+                userAddress = await signer.getAddress();
+
                 stakingTokenContract = new ethers.Contract(stakingTokenAddress, abiStakingToken, signer);
                 stakingContract = new ethers.Contract(stakingContractAddress, abiStakingContract, signer);
-                const address = await signer.getAddress();
-                document.getElementById("walletAddress").innerText = `Connected: ${address}`;
+
+                document.getElementById("walletAddress").innerText = `Connected: ${userAddress}`;
+                await updateBalances();
                 setStatus("Wallet Connected!");
             } else {
                 alert("Please install MetaMask.");
             }
         });
+
+        async function updateBalances() {
+            const balance = await stakingTokenContract.balanceOf(userAddress);
+            const formattedBalance = ethers.utils.formatUnits(balance, 18);
+            document.getElementById("lpBalance").innerText = `LP Balance: ${formattedBalance}`;
+
+            const allowance = await stakingTokenContract.allowance(userAddress, stakingContractAddress);
+            const formattedAllowance = ethers.utils.formatUnits(allowance, 18);
+            document.getElementById("allowance").innerText = `Approved Allowance: ${formattedAllowance}`;
+        }
 
         async function approveTokens() {
             const amount = getAmount();
@@ -83,6 +98,7 @@
                 const tx = await stakingTokenContract.approve(stakingContractAddress, amount);
                 await tx.wait();
                 setStatus("Tokens Approved!");
+                await updateBalances();
             } catch (error) {
                 handleError("approval", error);
             }
@@ -92,10 +108,23 @@
             const amount = getAmount();
             if (!amount) return;
             try {
+                const allowance = await stakingTokenContract.allowance(userAddress, stakingContractAddress);
+                if (amount.gt(allowance)) {
+                    setStatus("Error: Not enough allowance. Please approve first.");
+                    return;
+                }
+
+                const balance = await stakingTokenContract.balanceOf(userAddress);
+                if (amount.gt(balance)) {
+                    setStatus("Error: Not enough LP token balance.");
+                    return;
+                }
+
                 setStatus("Staking Tokens...");
                 const tx = await stakingContract.stake(amount);
                 await tx.wait();
                 setStatus(`Successfully Staked ${ethers.utils.formatUnits(amount, 18)} Tokens!`);
+                await updateBalances();
             } catch (error) {
                 handleError("staking", error);
             }
@@ -130,8 +159,7 @@
         async function checkStakedBalance() {
             try {
                 setStatus("Checking Balance...");
-                const address = await signer.getAddress();
-                const [staked, rewards] = await stakingContract.getStakeInfo(address);
+                const [staked, rewards] = await stakingContract.getStakeInfo(userAddress);
                 setStatus(`Staked: ${ethers.utils.formatUnits(staked, 18)} | Rewards: ${ethers.utils.formatUnits(rewards, 18)}`);
             } catch (error) {
                 handleError("balance check", error);
@@ -145,7 +173,7 @@
                 alert("Please enter a valid amount.");
                 return null;
             }
-            return ethers.utils.parseUnits(input, 18);
+            return ethers.utils.parseUnits(input.toString(), 18);
         }
 
         function setStatus(message) {
