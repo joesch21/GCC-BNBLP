@@ -8,182 +8,195 @@
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 <body>
-    <header>
-        <div class="header-content">
-            <img src="no_mask.png" alt="Logo">
-            <a href="https://pancakeswap.finance/" target="_blank" rel="noopener noreferrer">Visit Pancakeswap LP Provider Site</a>
-            <span>Staking with PancakeSwap</span>
-        </div>
-        <nav>
-            <a href="https://www.gcc-bsc.online/main.html">GCC Home Page</a>
-        </nav>
-    </header>
+<header>
+    <div class="header-content">
+        <img src="no_mask.png" alt="Logo">
+        <a href="https://pancakeswap.finance/" target="_blank" rel="noopener noreferrer">Visit Pancakeswap LP Provider Site</a>
+        <span>Staking with PancakeSwap</span>
+    </div>
+    <nav>
+        <a href="https://www.gcc-bsc.online/main.html">GCC Home Page</a>
+    </nav>
+</header>
 
-    <main class="container">
-        <h1>GCC Staking Rewards</h1>
-        <button id="connectBtn">Connect Wallet</button>
-        <p id="walletAddress"></p>
-        <p id="lpBalance"></p>
-        <p id="allowance"></p>
+<main class="container">
+    <h1>GCC Staking Rewards</h1>
+    <button id="connectBtn">Connect Wallet</button>
+    <p id="walletAddress"></p>
+    <p id="lpBalance"></p>
+    <p id="allowance"></p>
 
-        <div class="input-group">
-            <label for="amount">Amount (GCC-BNB LP 0x3d32d359bdad07C587a52F8811027675E4f5A833):</label>
-            <input type="number" id="amount" placeholder="Enter amount">
-            <button id="maxBtn">Max</button>
-        </div>
+    <div class="input-group">
+        <label for="amount">Amount (GCC-BNB LP 0x3d32...5A833):</label>
+        <input type="number" id="amount" placeholder="Enter amount">
+        <button onclick="setMaxRewards()">Max Rewards</button>
+    </div>
 
-        <div class="button-group">
-            <button onclick="approveTokens()">Approve</button>
-            <button onclick="stakeTokens()">Stake</button>
-            <button onclick="withdrawStakedTokens()">Withdraw Stake</button>
-            <button onclick="withdrawRewardTokens()">Withdraw Rewards</button>
-            <button onclick="checkStakedBalance()">Check Balance</button>
-        </div>
+    <div class="button-group">
+        <button onclick="approveTokens()">Approve</button>
+        <button onclick="stakeTokens()">Stake</button>
+        <button onclick="withdrawStakedTokens()">Withdraw Stake</button>
+        <button onclick="withdrawRewardTokens()">Withdraw Rewards</button>
+        <button onclick="checkStakedBalance()">Check Balance</button>
+    </div>
 
-        <div id="status">Awaiting Action...</div>
-    </main>
+    <div id="status">Awaiting Action...</div>
+</main>
 
-    <script>
-        const stakingTokenAddress = "0x3d32d359bdad07C587a52F8811027675E4f5A833"; // LP Token Address
-        const stakingContractAddress = "0x531DD2b75D345C6746957e44Bc22BF2E433094f8";
+<script>
+    const stakingTokenAddress = "0x3d32d359bdad07C587a52F8811027675E4f5A833";
+    const stakingContractAddress = "0x531DD2b75D345C6746957e44Bc22BF2E433094f8";
 
-        const abiStakingContract = [
-            "function stake(uint256 amount) public",
-            "function withdraw(uint256 amount) public",
-            "function withdrawRewardTokens(uint256 amount) public",
-            "function getStakeInfo(address _staker) view returns (uint256 _tokensStaked, uint256 _rewards)"
-        ];
+    const abiStakingContract = [
+        "function stake(uint256 amount) public",
+        "function withdraw(uint256 amount) public",
+        "function withdrawRewardTokens(uint256 amount) public",
+        "function getStakeInfo(address _staker) view returns (uint256 _tokensStaked, uint256 _rewards)"
+    ];
 
-        const abiStakingToken = [
-            "function approve(address spender, uint256 amount) public returns (bool)",
-            "function allowance(address owner, address spender) public view returns (uint256)",
-            "function balanceOf(address owner) public view returns (uint256)"
-        ];
+    const abiStakingToken = [
+        "function approve(address spender, uint256 amount) public returns (bool)",
+        "function allowance(address owner, address spender) public view returns (uint256)",
+        "function balanceOf(address owner) public view returns (uint256)"
+    ];
 
-        let provider, signer, stakingTokenContract, stakingContract, userAddress;
+    let provider, signer, stakingTokenContract, stakingContract, userAddress;
 
-        document.getElementById("connectBtn").addEventListener("click", async () => {
-            if (window.ethereum) {
-                provider = new ethers.providers.Web3Provider(window.ethereum);
-                await provider.send("eth_requestAccounts", []);
-                signer = provider.getSigner();
-                userAddress = await signer.getAddress();
+    document.getElementById("connectBtn").addEventListener("click", async () => {
+        if (window.ethereum) {
+            provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            await provider.send("eth_requestAccounts", []);
+            signer = provider.getSigner();
+            userAddress = await signer.getAddress();
 
-                stakingTokenContract = new ethers.Contract(stakingTokenAddress, abiStakingToken, signer);
-                stakingContract = new ethers.Contract(stakingContractAddress, abiStakingContract, signer);
+            stakingTokenContract = new ethers.Contract(stakingTokenAddress, abiStakingToken, signer);
+            stakingContract = new ethers.Contract(stakingContractAddress, abiStakingContract, signer);
 
-                document.getElementById("walletAddress").innerText = `Connected: ${userAddress}`;
-                await updateBalances();
-                setStatus("Wallet Connected!");
-            } else {
-                alert("Please install MetaMask.");
-            }
-        });
+            document.getElementById("walletAddress").innerText = `Connected: ${userAddress}`;
+            await updateBalances();
+            setStatus("Wallet Connected!");
+        } else {
+            alert("Please install MetaMask.");
+        }
+    });
 
-        async function updateBalances() {
-            const balance = await stakingTokenContract.balanceOf(userAddress);
-            const formattedBalance = ethers.utils.formatUnits(balance, 18);
-            document.getElementById("lpBalance").innerText = `LP Balance: ${formattedBalance}`;
+    async function updateBalances() {
+        const balance = await stakingTokenContract.balanceOf(userAddress);
+        document.getElementById("lpBalance").innerText = `LP Balance: ${ethers.utils.formatUnits(balance, 18)}`;
+        const allowance = await stakingTokenContract.allowance(userAddress, stakingContractAddress);
+        document.getElementById("allowance").innerText = `Approved Allowance: ${ethers.utils.formatUnits(allowance, 18)}`;
+    }
 
+    async function approveTokens() {
+        const amount = getAmount();
+        if (!amount) return;
+        try {
+            setStatus("Approving Tokens...");
+            const tx = await stakingTokenContract.approve(stakingContractAddress, amount);
+            await tx.wait();
+            setStatus("Tokens Approved!");
+            await updateBalances();
+        } catch (error) {
+            handleError("approval", error);
+        }
+    }
+
+    async function stakeTokens() {
+        const amount = getAmount();
+        if (!amount) return;
+        try {
             const allowance = await stakingTokenContract.allowance(userAddress, stakingContractAddress);
-            const formattedAllowance = ethers.utils.formatUnits(allowance, 18);
-            document.getElementById("allowance").innerText = `Approved Allowance: ${formattedAllowance}`;
-        }
-
-        async function approveTokens() {
-            const amount = getAmount();
-            if (!amount) return;
-            try {
-                setStatus("Approving Tokens...");
-                const tx = await stakingTokenContract.approve(stakingContractAddress, amount);
-                await tx.wait();
-                setStatus("Tokens Approved!");
-                await updateBalances();
-            } catch (error) {
-                handleError("approval", error);
+            if (amount.gt(allowance)) {
+                setStatus("Error: Not enough allowance. Please approve first.");
+                return;
             }
-        }
 
-        async function stakeTokens() {
-            const amount = getAmount();
-            if (!amount) return;
-            try {
-                const allowance = await stakingTokenContract.allowance(userAddress, stakingContractAddress);
-                if (amount.gt(allowance)) {
-                    setStatus("Error: Not enough allowance. Please approve first.");
-                    return;
-                }
-
-                const balance = await stakingTokenContract.balanceOf(userAddress);
-                if (amount.gt(balance)) {
-                    setStatus("Error: Not enough LP token balance.");
-                    return;
-                }
-
-                setStatus("Staking Tokens...");
-                const tx = await stakingContract.stake(amount);
-                await tx.wait();
-                setStatus(`Successfully Staked ${ethers.utils.formatUnits(amount, 18)} Tokens!`);
-                await updateBalances();
-            } catch (error) {
-                handleError("staking", error);
+            const balance = await stakingTokenContract.balanceOf(userAddress);
+            if (amount.gt(balance)) {
+                setStatus("Error: Not enough LP token balance.");
+                return;
             }
-        }
 
-        async function withdrawStakedTokens() {
-            const amount = getAmount();
-            if (!amount) return;
-            try {
-                setStatus("Withdrawing Staked Tokens...");
-                const tx = await stakingContract.withdraw(amount);
-                await tx.wait();
-                setStatus(`Withdrawn ${ethers.utils.formatUnits(amount, 18)} Tokens!`);
-            } catch (error) {
-                handleError("withdrawal", error);
+            setStatus("Staking Tokens...");
+            const tx = await stakingContract.stake(amount);
+            await tx.wait();
+            setStatus(`Successfully Staked ${ethers.utils.formatUnits(amount, 18)} Tokens!`);
+            await updateBalances();
+        } catch (error) {
+            handleError("staking", error);
+        }
+    }
+
+    async function withdrawStakedTokens() {
+        const amount = getAmount();
+        if (!amount) return;
+        try {
+            setStatus("Withdrawing Staked Tokens...");
+            const tx = await stakingContract.withdraw(amount);
+            await tx.wait();
+            setStatus(`Withdrawn ${ethers.utils.formatUnits(amount, 18)} Tokens!`);
+        } catch (error) {
+            handleError("withdrawal", error);
+        }
+    }
+
+    async function withdrawRewardTokens() {
+        const amount = getAmount();
+        if (!amount) return;
+        try {
+            setStatus("Checking rewards...");
+            const [_staked, rewards] = await stakingContract.getStakeInfo(userAddress);
+            if (rewards.lt(amount)) {
+                setStatus("Error: Not enough reward tokens to withdraw.");
+                return;
             }
-        }
 
-        async function withdrawRewardTokens() {
-            const amount = getAmount();
-            if (!amount) return;
-            try {
-                setStatus("Withdrawing Rewards...");
-                const tx = await stakingContract.withdrawRewardTokens(amount);
-                await tx.wait();
-                setStatus(`Withdrawn ${ethers.utils.formatUnits(amount, 18)} Reward Tokens!`);
-            } catch (error) {
-                handleError("reward withdrawal", error);
-            }
+            setStatus("Withdrawing Rewards...");
+            const tx = await stakingContract.withdrawRewardTokens(amount);
+            await tx.wait();
+            setStatus(`Withdrawn ${ethers.utils.formatUnits(amount, 18)} Reward Tokens!`);
+        } catch (error) {
+            handleError("reward withdrawal", error);
         }
+    }
 
-        async function checkStakedBalance() {
-            try {
-                setStatus("Checking Balance...");
-                const [staked, rewards] = await stakingContract.getStakeInfo(userAddress);
-                setStatus(`Staked: ${ethers.utils.formatUnits(staked, 18)} | Rewards: ${ethers.utils.formatUnits(rewards, 18)}`);
-            } catch (error) {
-                handleError("balance check", error);
-            }
+    async function setMaxRewards() {
+        try {
+            const [_staked, rewards] = await stakingContract.getStakeInfo(userAddress);
+            document.getElementById("amount").value = ethers.utils.formatUnits(rewards, 18);
+        } catch (error) {
+            handleError("setMaxRewards", error);
         }
+    }
 
-        function getAmount() {
-            const input = document.getElementById("amount").value;
-            const amount = parseFloat(input);
-            if (isNaN(amount) || amount <= 0) {
-                alert("Please enter a valid amount.");
-                return null;
-            }
-            return ethers.utils.parseUnits(input.toString(), 18);
+    async function checkStakedBalance() {
+        try {
+            setStatus("Checking Balance...");
+            const [staked, rewards] = await stakingContract.getStakeInfo(userAddress);
+            setStatus(`Staked: ${ethers.utils.formatUnits(staked, 18)} | Rewards: ${ethers.utils.formatUnits(rewards, 18)}`);
+        } catch (error) {
+            handleError("balance check", error);
         }
+    }
 
-        function setStatus(message) {
-            document.getElementById("status").innerText = message;
+    function getAmount() {
+        const input = document.getElementById("amount").value;
+        const amount = parseFloat(input);
+        if (isNaN(amount) || amount <= 0) {
+            alert("Please enter a valid amount.");
+            return null;
         }
+        return ethers.utils.parseUnits(input.toString(), 18);
+    }
 
-        function handleError(action, error) {
-            console.error(`${action} error:`, error);
-            setStatus(`Error during ${action}: ${error.message}`);
-        }
-    </script>
+    function setStatus(message) {
+        document.getElementById("status").innerText = message;
+    }
+
+    function handleError(action, error) {
+        console.error(`${action} error:`, error);
+        setStatus(`Error during ${action}: ${error.message}`);
+    }
+</script>
 </body>
 </html>
